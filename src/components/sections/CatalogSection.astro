@@ -1,0 +1,101 @@
+---
+import type { ProductItem } from '../../types/catalog';
+import { getProductImageUrl } from '../../lib/catalog';
+
+interface Props {
+  products: ProductItem[];
+}
+
+const { products } = Astro.props;
+const visibleProducts = products.filter((product) => product.visible);
+const categories = [...new Set(visibleProducts.map((product) => product.category))];
+const formatPrice = (price: number, currency: ProductItem['currency']) =>
+  new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0
+  }).format(price);
+---
+
+<section id="catalogo" class="wrapper">
+  <div class="section-title reveal">
+    <h3>Catalogo de Zapatos</h3>
+    <p>Busca por modelo y filtra por precio</p>
+  </div>
+
+  <div class="catalog-controls reveal" aria-label="Controles del catalogo">
+    <input type="search" id="searchInput" placeholder="Buscar modelo..." aria-label="Buscar modelo" />
+    <select id="categoryFilter" aria-label="Filtrar por categoria">
+      <option value="">Todas las categorias</option>
+      {categories.map((category) => <option value={category}>{category}</option>)}
+    </select>
+    <input type="number" id="minPrice" min="0" step="50" placeholder="Precio min" aria-label="Precio minimo" />
+    <input type="number" id="maxPrice" min="0" step="50" placeholder="Precio max" aria-label="Precio maximo" />
+  </div>
+
+  <div id="productsGrid" class="products-grid" aria-live="polite">
+    {visibleProducts.map((product) => (
+      <a
+        class="product-card product-card-link reveal"
+        href={`/productos/${product.id}`}
+        data-name={product.name.toLowerCase()}
+        data-category={product.category}
+        data-price={product.price}
+      >
+        <div class="shoe-preview" role="img" aria-label={`Vista previa de ${product.name}`}>
+          <img src={getProductImageUrl(product.images[0])} alt={product.name} class="shoe-preview-image" loading="lazy" />
+        </div>
+        <div class="row">
+          <strong>{product.name}</strong>
+          <span class="badge">{product.tag}</span>
+        </div>
+        <p class="product-description">{product.description}</p>
+        <div class="row">
+          <span>{product.category}</span>
+          {product.isPromotion ? <span class="badge promo-tag">Promocion</span> : <span></span>}
+        </div>
+        <div class="price">{formatPrice(product.price, product.currency)}</div>
+        <span class="card-action">Ver detalle</span>
+      </a>
+    ))}
+  </div>
+</section>
+
+<script>
+  const searchInput = document.getElementById('searchInput');
+  const categoryFilter = document.getElementById('categoryFilter');
+  const minPriceInput = document.getElementById('minPrice');
+  const maxPriceInput = document.getElementById('maxPrice');
+  const productCards = Array.from(document.querySelectorAll('.product-card'));
+
+  const filterProducts = () => {
+    const query = (searchInput instanceof HTMLInputElement ? searchInput.value : '').toLowerCase().trim();
+    const category = categoryFilter instanceof HTMLSelectElement ? categoryFilter.value : '';
+    const minPrice = minPriceInput instanceof HTMLInputElement ? Number(minPriceInput.value || 0) : 0;
+    const maxPrice =
+      maxPriceInput instanceof HTMLInputElement && maxPriceInput.value !== ''
+        ? Number(maxPriceInput.value)
+        : Number.POSITIVE_INFINITY;
+
+    productCards.forEach((card) => {
+      if (!(card instanceof HTMLElement)) {
+        return;
+      }
+
+      const productName = card.dataset.name || '';
+      const productCategory = card.dataset.category || '';
+      const productPrice = Number(card.dataset.price || 0);
+
+      const matchesSearch = productName.includes(query);
+      const matchesCategory = category ? productCategory === category : true;
+      const matchesPrice = productPrice >= minPrice && productPrice <= maxPrice;
+
+      card.style.display = matchesSearch && matchesCategory && matchesPrice ? 'flex' : 'none';
+    });
+  };
+
+  [searchInput, categoryFilter, minPriceInput, maxPriceInput].forEach((element) => {
+    element?.addEventListener('input', filterProducts);
+    element?.addEventListener('change', filterProducts);
+  });
+</script>

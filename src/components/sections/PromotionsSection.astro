@@ -1,0 +1,27 @@
+---
+import type { PromotionItem } from '../../types/catalog';
+
+interface Props {
+  promotions: PromotionItem[];
+}
+
+const { promotions } = Astro.props;
+---
+
+<section id="promociones" class="wrapper">
+  <div class="section-title reveal">
+    <h3>Promociones Activas</h3>
+    <p>Ofertas por tiempo limitado</p>
+  </div>
+
+  <div class="promos">
+    {promotions.map((promotion, index) => (
+      <article class={`promo-card reveal stagger-${Math.min(index + 1, 3)}`}>
+        <strong>Promo</strong>
+        <h4>{promotion.title}</h4>
+        <p>{promotion.description}</p>
+        <a href={promotion.redirect} class="promo-link">Ver detalles</a>
+      </article>
+    ))}
+  </div>
+</section>

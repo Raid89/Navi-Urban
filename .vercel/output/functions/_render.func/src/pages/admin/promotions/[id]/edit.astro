@@ -1,0 +1,41 @@
+---
+import BaseLayout from '../../../../components/layout/BaseLayout.astro';
+import Navbar from '../../../../components/sections/Navbar.astro';
+import SiteFooter from '../../../../components/sections/SiteFooter.astro';
+import PromotionEditorForm from '../../../../components/admin/PromotionEditorForm.astro';
+import { getAuthenticatedAdmin } from '../../../../lib/adminSession';
+import { getPromotionById } from '../../../../lib/cms';
+
+const auth = await getAuthenticatedAdmin(Astro.cookies);
+
+if (!auth) {
+  return Astro.redirect('/admin?error=unauthorized');
+}
+
+const promotionId = Astro.params.id;
+const promotion = promotionId ? await getPromotionById(promotionId) : null;
+
+if (!promotion) {
+  throw new Response('Promocion no encontrada', { status: 404 });
+}
+---
+
+<BaseLayout title={`Editar ${promotion.title} | NAVI URBAN Admin`} description="Editar promocion en CMS de NAVI URBAN.">
+  <Navbar />
+  <main class="wrapper admin-page">
+    <PromotionEditorForm
+      promotion={promotion}
+      title={`Editar ${promotion.title}`}
+      subtitle="Promociones"
+      submitLabel="Guardar cambios"
+      cancelHref="/admin?view=promotions"
+    />
+  </main>
+  <SiteFooter />
+
+  <style>
+    .admin-page {
+      padding: 2rem 0 3rem;
+    }
+  </style>
+</BaseLayout>

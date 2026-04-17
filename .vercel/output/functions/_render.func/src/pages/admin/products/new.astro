@@ -1,0 +1,32 @@
+---
+import BaseLayout from '../../../components/layout/BaseLayout.astro';
+import Navbar from '../../../components/sections/Navbar.astro';
+import SiteFooter from '../../../components/sections/SiteFooter.astro';
+import ProductEditorForm from '../../../components/admin/ProductEditorForm.astro';
+import { getAuthenticatedAdmin } from '../../../lib/adminSession';
+
+const auth = await getAuthenticatedAdmin(Astro.cookies);
+
+if (!auth) {
+  return Astro.redirect('/admin?error=unauthorized');
+}
+---
+
+<BaseLayout title="Nuevo Producto | NAVI URBAN Admin" description="Crear nuevo producto en CMS de NAVI URBAN.">
+  <Navbar />
+  <main class="wrapper admin-page">
+    <ProductEditorForm
+      title="Nuevo producto"
+      subtitle="Productos"
+      submitLabel="Crear producto"
+      cancelHref="/admin?view=products"
+    />
+  </main>
+  <SiteFooter />
+
+  <style>
+    .admin-page {
+      padding: 2rem 0 3rem;
+    }
+  </style>
+</BaseLayout>

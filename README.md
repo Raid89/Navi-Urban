@@ -1,43 +1,64 @@
-# Astro Starter Kit: Minimal
+# NAVI URBAN
 
-```sh
-npm create astro@latest -- --template minimal
-```
+Landing + catalogo SSR con Astro, MongoDB Atlas, CMS privado y carga de imagenes con Cloudinary.
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+## Desarrollo local
 
-## 🚀 Project Structure
+1. Instala dependencias:
+	 ```bash
+	 npm install
+	 ```
+2. Crea tu archivo `.env` basado en `.env.example`.
+3. Inicia el entorno local:
+	 ```bash
+	 npm run dev
+	 ```
 
-Inside of your Astro project, you'll see the following folders and files:
+## Scripts
 
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
-```
+- `npm run dev`: servidor local
+- `npm run build`: build de produccion
+- `npm run preview`: preview local del build
+- `npm run seed:atlas`: carga/actualiza datos iniciales en Atlas
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+## Despliegue en Vercel
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+Este proyecto usa `@astrojs/vercel/serverless` para SSR.
 
-Any static assets, like images, can be placed in the `public/` directory.
+### 1) Importar repositorio en Vercel
 
-## 🧞 Commands
+- En Vercel, crea un proyecto desde tu repo.
+- Framework: `Astro` (Vercel lo detecta automaticamente).
+- Build command: `npm run build`.
 
-All commands are run from the root of the project, from a terminal:
+### 2) Variables de entorno
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
+Configura estas variables en Vercel (Project Settings > Environment Variables):
 
-## 👀 Want to learn more?
+- `MONGODB_URI`
+- `MONGODB_DB`
+- `ADMIN_SESSION_SECRET`
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+- `ADMIN_DISPLAY_NAME`
+- `CLOUDINARY_UPLOAD_FOLDER`
 
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+Cloudinary puede configurarse de cualquiera de estas formas:
+
+- Opcion A:
+	- `CLOUDINARY_CLOUD_NAME`
+	- `CLOUDINARY_API_KEY`
+	- `CLOUDINARY_API_SECRET`
+- Opcion B:
+	- `CLOUDINARY_URL` con formato:
+		`cloudinary://<api_key>:<api_secret>@<cloud_name>`
+
+### 3) Deploy
+
+- Ejecuta deploy desde Vercel.
+- Si usas seed inicial, ejecuta `npm run seed:atlas` apuntando al mismo `MONGODB_URI`/`MONGODB_DB` de produccion.
+
+## Notas
+
+- El CMS requiere login admin para CRUD y subida de imagenes.
+- Las rutas publicas leen productos/promociones directamente desde MongoDB.

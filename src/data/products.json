@@ -1,0 +1,237 @@
+[
+  {
+    "id": "navi-sprint-01",
+    "name": "NAVI Sprint 01",
+    "category": "Running",
+    "description": "Ligero y respirable para entrenamientos diarios.",
+    "price": 899,
+    "currency": "MXN",
+    "tag": "Nuevo",
+    "isPromotion": true,
+    "visible": true,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1518002171953-a080ee817e1f?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "sizes": [
+      { "size": "24", "available": true },
+      { "size": "25", "available": true },
+      { "size": "26", "available": true },
+      { "size": "27", "available": false },
+      { "size": "28", "available": true }
+    ]
+  },
+  {
+    "id": "navi-shadow-mid",
+    "name": "NAVI Shadow Mid",
+    "category": "Urbano",
+    "description": "Perfil medio con suela reforzada para ciudad.",
+    "price": 1099,
+    "currency": "MXN",
+    "tag": "Top Ventas",
+    "isPromotion": false,
+    "visible": true,
+    "images": [
+      "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1607522370275-f14206abe5d3?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1584735175315-9d5df23be620?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "sizes": [
+      { "size": "25", "available": true },
+      { "size": "26", "available": false },
+      { "size": "27", "available": true },
+      { "size": "28", "available": true },
+      { "size": "29", "available": false }
+    ]
+  },
+  {
+    "id": "navi-flex-street",
+    "name": "NAVI Flex Street",
+    "category": "Casual",
+    "description": "Comodidad de uso diario con estilo minimal.",
+    "price": 799,
+    "currency": "MXN",
+    "tag": "Promo",
+    "isPromotion": true,
+    "visible": true,
+    "images": [
+      "https://images.unsplash.com/photo-1460353581641-37baddab0fa2?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1529810313688-44ea1c2d81d3?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1595341888016-a392ef81b7de?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "sizes": [
+      { "size": "23", "available": true },
+      { "size": "24", "available": true },
+      { "size": "25", "available": true },
+      { "size": "26", "available": true },
+      { "size": "27", "available": false },
+      { "size": "28", "available": false },
+      { "size": "29", "available": false },
+      { "size": "30", "available": false },
+      { "size": "31", "available": true },
+      { "size": "32", "available": true }
+    ]
+  },
+  {
+    "id": "navi-motion-air",
+    "name": "NAVI Motion Air",
+    "category": "Running",
+    "description": "Amortiguacion avanzada para largas distancias.",
+    "price": 1199,
+    "currency": "MXN",
+    "tag": "Premium",
+    "isPromotion": false,
+    "visible": true,
+    "images": [
+      "https://images.unsplash.com/photo-1556906781-9a412961c28c?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1539185441755-769473a23570?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "sizes": [
+      { "size": "25", "available": true },
+      { "size": "26", "available": true },
+      { "size": "27", "available": true },
+      { "size": "28", "available": true },
+      { "size": "29", "available": true }
+    ]
+  },
+  {
+    "id": "navi-pulse-retro",
+    "name": "NAVI Pulse Retro",
+    "category": "Lifestyle",
+    "description": "Inspiracion noventera con materiales modernos.",
+    "price": 999,
+    "currency": "MXN",
+    "tag": "Edicion",
+    "isPromotion": true,
+    "visible": true,
+    "images": [
+      "https://images.unsplash.com/photo-1575537302964-96cd47c06b1b?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1600269452121-4f2416e55c28?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "sizes": [
+      { "size": "24", "available": false },
+      { "size": "25", "available": true },
+      { "size": "26", "available": true },
+      { "size": "27", "available": true },
+      { "size": "28", "available": false }
+    ]
+  },
+  {
+    "id": "navi-core-daily",
+    "name": "NAVI Core Daily",
+    "category": "Casual",
+    "description": "Modelo base para combinaciones de todos los dias.",
+    "price": 699,
+    "currency": "MXN",
+    "tag": "Basico",
+    "isPromotion": false,
+    "visible": false,
+    "images": [
+      "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1612181346599-a6bfbd67be86?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1543508282-6319a3e2621f?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "sizes": [
+      { "size": "23", "available": true },
+      { "size": "24", "available": true },
+      { "size": "25", "available": true },
+      { "size": "26", "available": false },
+      { "size": "27", "available": false }
+    ]
+  },
+  {
+    "id": "navi-drift-low",
+    "name": "NAVI Drift Low",
+    "category": "Skate",
+    "description": "Suela plana y agarre optimo para tabla.",
+    "price": 949,
+    "currency": "MXN",
+    "tag": "Promo",
+    "isPromotion": true,
+    "visible": true,
+    "images": [
+      "https://images.unsplash.com/photo-1515955656352-a1fa3ffcd111?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1465453869711-7e174808ace9?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1473010351802-2c821a880fc0?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "sizes": [
+      { "size": "24", "available": true },
+      { "size": "25", "available": false },
+      { "size": "26", "available": true },
+      { "size": "27", "available": true },
+      { "size": "28", "available": true }
+    ]
+  },
+  {
+    "id": "navi-aero-shift",
+    "name": "NAVI Aero Shift",
+    "category": "Running",
+    "description": "Control de estabilidad y retorno de energia.",
+    "price": 1249,
+    "currency": "MXN",
+    "tag": "Nuevo",
+    "isPromotion": false,
+    "visible": true,
+    "images": [
+      "https://images.unsplash.com/photo-1463100099107-aa0980c362e6?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1527010154944-f2241763d806?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "sizes": [
+      { "size": "25", "available": true },
+      { "size": "26", "available": true },
+      { "size": "27", "available": false },
+      { "size": "28", "available": true },
+      { "size": "29", "available": true }
+    ]
+  },
+  {
+    "id": "navi-grid-one",
+    "name": "NAVI Grid One",
+    "category": "Urbano",
+    "description": "Dise;o modular y acabado resistente.",
+    "price": 1049,
+    "currency": "MXN",
+    "tag": "Limitado",
+    "isPromotion": true,
+    "visible": false,
+    "images": [
+      "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1494496195158-c3becb4f2475?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1600185365527-3e16c8fe5302?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "sizes": [
+      { "size": "24", "available": false },
+      { "size": "25", "available": true },
+      { "size": "26", "available": true },
+      { "size": "27", "available": false },
+      { "size": "28", "available": true }
+    ]
+  },
+  {
+    "id": "navi-terra-move",
+    "name": "NAVI Terra Move",
+    "category": "Outdoor",
+    "description": "Traccion robusta para recorridos mixtos.",
+    "price": 1299,
+    "currency": "MXN",
+    "tag": "Resistente",
+    "isPromotion": false,
+    "visible": true,
+    "images": [
+      "https://images.unsplash.com/photo-1494495219694-7f2b8f5c6ed6?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1520639888713-7851133b1ed0?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1548883354-7622d03aca27?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "sizes": [
+      { "size": "25", "available": true },
+      { "size": "26", "available": true },
+      { "size": "27", "available": true },
+      { "size": "28", "available": true },
+      { "size": "29", "available": false }
+    ]
+  }
+]

@@ -1,0 +1,773 @@
+---
+import type { ProductItem } from '../../types/catalog';
+
+interface Props {
+  product?: ProductItem | null;
+  title: string;
+  subtitle: string;
+  submitLabel: string;
+  cancelHref: string;
+}
+
+const { product = null, title, subtitle, submitLabel, cancelHref } = Astro.props;
+
+const initialImages = JSON.stringify(product?.images ?? []);
+const initialSizes = JSON.stringify(product?.sizes ?? []);
+---
+
+<article class="editor-card">
+  <div class="editor-head">
+    <div>
+      <p class="eyebrow">{subtitle}</p>
+      <h1>{title}</h1>
+    </div>
+    <a class="btn btn-ghost" href={cancelHref}>Volver</a>
+  </div>
+
+  <form id="productForm" method="post" action="/api/admin/products" class="editor-form">
+    <input type="hidden" name="id" value={product?.id || ''} />
+    <input type="hidden" id="productImagesJson" name="imagesJson" value={initialImages} />
+    <input type="hidden" id="sizesJson" name="sizesJson" value={initialSizes} />
+
+    <label>
+      Nombre del producto
+      <input name="name" value={product?.name || ''} placeholder="NAVI Sprint 01" required />
+    </label>
+
+    <div class="two-cols">
+      <label>
+        Categoria
+        <input name="category" value={product?.category || ''} placeholder="Running" required />
+      </label>
+      <label>
+        Tag
+        <input name="tag" value={product?.tag || ''} placeholder="Nuevo" required />
+      </label>
+    </div>
+
+    <label>
+      Descripcion
+      <textarea name="description" rows="4" required>{product?.description || ''}</textarea>
+    </label>
+
+    <div class="two-cols">
+      <label>
+        Precio
+        <input name="price" type="number" min="0" step="1" value={product?.price || 0} required />
+      </label>
+      <div class="switches">
+        <label class="switch"><input name="isPromotion" type="checkbox" checked={product?.isPromotion} /> En promocion</label>
+        <label class="switch"><input name="visible" type="checkbox" checked={product?.visible ?? true} /> Visible</label>
+      </div>
+    </div>
+
+    <section class="subsection">
+      <div class="subsection-head">
+        <h2>Tallas</h2>
+        <p>Gestiona disponibilidad sin escribir JSON.</p>
+      </div>
+      <div id="sizesBoard" class="sizes-board"></div>
+      <div class="size-adder">
+        <input id="newSizeInput" placeholder="Nueva talla (ej. 28)" />
+        <button type="button" class="btn btn-ghost" id="addSizeButton">Agregar talla</button>
+      </div>
+    </section>
+
+    <section class="subsection">
+      <div class="subsection-head">
+        <h2>Imagenes</h2>
+        <p>Sube imagenes a Cloudinary y revisa la previsualizacion.</p>
+      </div>
+      <div class="upload-actions">
+        <input id="productImageInput" type="file" accept="image/*" multiple />
+        <button class="btn btn-ghost" type="button" id="uploadProductImages">Subir imagenes</button>
+      </div>
+      <p id="uploadStatus" class="request-status" aria-live="polite"></p>
+      <div id="productImagesPreview" class="image-preview-grid"></div>
+    </section>
+
+    <button class="btn btn-main" type="submit" id="productSubmitButton" data-default-label={submitLabel}>{submitLabel}</button>
+  </form>
+</article>
+
+<script>
+  const productForm = document.getElementById('productForm');
+  const uploadButton = document.getElementById('uploadProductImages');
+  const productImageInput = document.getElementById('productImageInput');
+  const productImagesJson = document.getElementById('productImagesJson');
+  const productImagesPreview = document.getElementById('productImagesPreview');
+  const sizesJsonInput = document.getElementById('sizesJson');
+  const sizesBoard = document.getElementById('sizesBoard');
+  const newSizeInput = document.getElementById('newSizeInput');
+  const addSizeButton = document.getElementById('addSizeButton');
+  const uploadStatus = document.getElementById('uploadStatus');
+  const submitButton = document.getElementById('productSubmitButton');
+  let isSubmitting = false;
+
+  const setButtonBusy = (button, isBusy, busyLabel) => {
+    if (!(button instanceof HTMLButtonElement)) return;
+    const defaultLabel = button.dataset.defaultLabel || button.textContent || '';
+
+    if (!button.dataset.defaultLabel) {
+      button.dataset.defaultLabel = defaultLabel;
+    }
+
+    button.disabled = isBusy;
+    button.setAttribute('aria-busy', String(isBusy));
+    button.textContent = isBusy ? busyLabel : (button.dataset.defaultLabel || defaultLabel);
+  };
+
+  const setUploadStatus = (text = '') => {
+    if (!(uploadStatus instanceof HTMLElement)) return;
+    uploadStatus.textContent = text;
+  };
+
+  const parseImages = () => {
+    try {
+      return JSON.parse(productImagesJson?.value || '[]');
+    } catch {
+      return [];
+    }
+  };
+
+  const parseSizes = () => {
+    try {
+      return JSON.parse(sizesJsonInput?.value || '[]');
+    } catch {
+      return [];
+    }
+  };
+
+  const saveSizes = (sizes) => {
+    if (sizesJsonInput) {
+      sizesJsonInput.value = JSON.stringify(sizes);
+    }
+  };
+
+  const renderSizes = () => {
+    if (!sizesBoard) return;
+    const sizes = parseSizes();
+
+    if (!sizes.length) {
+      sizesBoard.innerHTML = '<p class="empty-note">Aun no hay tallas. Agrega una para comenzar.</p>';
+      return;
+    }
+
+    sizesBoard.innerHTML = sizes
+      .map(
+        (sizeOption, index) => `
+          <article class="size-card ${sizeOption.available ? 'available' : 'unavailable'}" data-size-index="${index}">
+            <div class="size-card-main">
+              <strong>Talla ${sizeOption.size}</strong>
+              <span>${sizeOption.available ? 'Disponible' : 'Agotada'}</span>
+            </div>
+            <div class="size-card-actions">
+              <button type="button" class="size-toggle">${sizeOption.available ? 'Marcar agotada' : 'Marcar disponible'}</button>
+              <button type="button" class="size-remove" data-remove-size="${index}">Eliminar</button>
+            </div>
+          </article>
+        `
+      )
+      .join('');
+
+    sizesBoard.querySelectorAll('.size-toggle').forEach((button) => {
+      button.addEventListener('click', () => {
+        const parent = button.closest('[data-size-index]');
+        const index = Number(parent?.getAttribute('data-size-index'));
+        const current = parseSizes();
+        if (Number.isNaN(index) || !current[index]) return;
+        current[index].available = !current[index].available;
+        saveSizes(current);
+        renderSizes();
+      });
+    });
+
+    sizesBoard.querySelectorAll('[data-remove-size]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const index = Number(button.getAttribute('data-remove-size'));
+        const current = parseSizes();
+        if (Number.isNaN(index)) return;
+        current.splice(index, 1);
+        saveSizes(current);
+        renderSizes();
+      });
+    });
+  };
+
+  const renderImages = () => {
+    const images = parseImages();
+    if (!productImagesPreview) return;
+
+    if (!images.length) {
+      productImagesPreview.innerHTML = '<p class="empty-note">Sube imagenes para ver la previsualizacion.</p>';
+      return;
+    }
+
+    const mainImage = images[0]?.url || images[0];
+    const thumbs = images
+      .map(
+        (image, index) => `
+          <article class="preview-item">
+            <div class="preview-thumb-wrap">
+              <img src="${image.url || image}" alt="Imagen ${index + 1}" />
+              <span class="preview-badge">#${index + 1}</span>
+            </div>
+            <button type="button" class="preview-remove" data-remove-image="${index}">Quitar</button>
+          </article>
+        `
+      )
+      .join('');
+
+    productImagesPreview.innerHTML = `
+      <article class="preview-main">
+        <img src="${mainImage}" alt="Imagen principal" />
+        <p>Imagen principal</p>
+      </article>
+      <div class="preview-thumbs-grid">${thumbs}</div>
+    `;
+
+    productImagesPreview.querySelectorAll('[data-remove-image]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const index = Number(button.getAttribute('data-remove-image'));
+        const current = parseImages();
+        if (Number.isNaN(index)) return;
+        current.splice(index, 1);
+        if (productImagesJson) productImagesJson.value = JSON.stringify(current);
+        renderImages();
+      });
+    });
+  };
+
+  const uploadImages = async () => {
+    const files = Array.from(productImageInput?.files || []);
+    if (!files.length) return;
+
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/admin/upload-image', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al subir una imagen');
+      }
+
+      const image = await response.json();
+      const current = parseImages();
+      current.push(image);
+      if (productImagesJson) productImagesJson.value = JSON.stringify(current);
+    }
+
+    if (productImageInput) productImageInput.value = '';
+    renderImages();
+  };
+
+  uploadButton?.addEventListener('click', async () => {
+    if (!(uploadButton instanceof HTMLButtonElement)) return;
+
+    try {
+      setButtonBusy(uploadButton, true, 'Subiendo...');
+      setUploadStatus('Subiendo imagenes...');
+      await uploadImages();
+      setUploadStatus('Imagenes subidas correctamente.');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'No se pudo subir la imagen');
+      setUploadStatus('No se pudieron subir las imagenes.');
+    } finally {
+      setButtonBusy(uploadButton, false, 'Subiendo...');
+    }
+  });
+
+  addSizeButton?.addEventListener('click', () => {
+    const sizeValue = String(newSizeInput?.value || '').trim();
+    if (!sizeValue) return;
+
+    const current = parseSizes();
+    if (current.some((item) => String(item.size) === sizeValue)) {
+      alert('Esa talla ya existe');
+      return;
+    }
+
+    current.push({ size: sizeValue, available: true });
+    saveSizes(current);
+    if (newSizeInput) newSizeInput.value = '';
+    renderSizes();
+  });
+
+  productForm?.addEventListener('submit', () => {
+    if (isSubmitting) return;
+    isSubmitting = true;
+
+    if (productImagesJson) {
+      productImagesJson.value = JSON.stringify(parseImages());
+    }
+    if (sizesJsonInput) {
+      sizesJsonInput.value = JSON.stringify(parseSizes());
+    }
+
+    setButtonBusy(submitButton, true, 'Guardando...');
+  });
+
+  renderSizes();
+  renderImages();
+</script>
+
+<style>
+  .editor-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 1rem;
+    box-shadow: 0 18px 40px rgba(17, 17, 17, 0.07);
+    overflow: hidden;
+  }
+
+  .editor-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .eyebrow {
+    margin: 0 0 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.75rem;
+    color: var(--brand);
+    font-weight: 800;
+  }
+
+  .editor-head h1 {
+    margin: 0;
+    font-size: clamp(1.4rem, 2.6vw, 2rem);
+  }
+
+  .editor-form {
+    display: grid;
+    gap: 0.9rem;
+    min-width: 0;
+  }
+
+  .editor-form label {
+    display: grid;
+    gap: 0.45rem;
+    font-weight: 700;
+  }
+
+  .editor-form input,
+  .editor-form textarea {
+    width: 100%;
+    max-width: 100%;
+    font: inherit;
+    border: 1px solid #cdc6b8;
+    background: #fff;
+    border-radius: 10px;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .editor-form input[type='file'] {
+    min-width: 0;
+  }
+
+  .editor-form textarea {
+    resize: vertical;
+  }
+
+  .two-cols {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .switches {
+    display: grid;
+    gap: 0.45rem;
+    align-content: center;
+  }
+
+  .switch {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-weight: 600;
+  }
+
+  .subsection {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--bg-soft);
+    padding: 0.85rem;
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .subsection-head h2 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .subsection-head p {
+    margin: 0.2rem 0 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+
+  .upload-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.6rem;
+    align-items: end;
+  }
+
+  .image-preview-grid {
+    display: grid;
+    gap: 0.75rem;
+    max-width: 560px;
+  }
+
+  .preview-main {
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fff;
+    max-width: 360px;
+    width: 100%;
+  }
+
+  .preview-main img {
+    display: block;
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+  }
+
+  .preview-main p {
+    margin: 0;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.76rem;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+  }
+
+  .preview-thumbs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 72px));
+    gap: 0.4rem;
+  }
+
+  .preview-item {
+    display: grid;
+    gap: 0.3rem;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 10px;
+    padding: 0.28rem;
+    width: 72px;
+  }
+
+  .preview-thumb-wrap {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .preview-item img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 7px;
+  }
+
+  .preview-badge {
+    position: absolute;
+    top: 0.3rem;
+    left: 0.3rem;
+    padding: 0.1rem 0.28rem;
+    border-radius: 999px;
+    background: rgba(17, 17, 17, 0.75);
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 700;
+  }
+
+  .preview-remove {
+    border: 1px solid #efc4c4;
+    background: #fff1f1;
+    color: #a94444;
+    border-radius: 999px;
+    font-size: 0.64rem;
+    font-weight: 700;
+    padding: 0.18rem 0.3rem;
+    cursor: pointer;
+  }
+
+  .sizes-board {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.55rem;
+  }
+
+  .size-card {
+    display: grid;
+    gap: 0.5rem;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    padding: 0.6rem;
+    background: #fff;
+  }
+
+  .size-card.available {
+    border-color: color-mix(in srgb, var(--ok) 35%, #fff);
+    background: color-mix(in srgb, var(--ok) 12%, #fff);
+  }
+
+  .size-card.unavailable {
+    border-color: #d4cfc3;
+    background: #f4f0e7;
+    color: #7b7b7b;
+  }
+
+  .size-card-main {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .size-card-main strong {
+    font-size: 0.95rem;
+  }
+
+  .size-card-main span {
+    font-size: 0.82rem;
+  }
+
+  .size-card-actions {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  .size-toggle,
+  .size-remove {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    cursor: pointer;
+    padding: 0.28rem 0.5rem;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .size-toggle {
+    background: #fff;
+    border-color: #d9d3c7;
+    color: #3e3e3e;
+  }
+
+  .size-remove {
+    background: #fff1f1;
+    border-color: #efc4c4;
+    color: #a94444;
+  }
+
+  .size-adder {
+    display: flex;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+  }
+
+  .size-adder input {
+    flex: 1;
+    min-width: 150px;
+  }
+
+  .empty-note {
+    margin: 0;
+    padding: 0.75rem;
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    color: var(--muted);
+    background: #fff;
+    font-size: 0.88rem;
+  }
+
+  .request-status {
+    margin: 0;
+    min-height: 1.1rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  @media (max-width: 900px) {
+    .two-cols {
+      grid-template-columns: 1fr;
+    }
+
+    .upload-actions {
+      grid-template-columns: 1fr;
+      align-items: stretch;
+    }
+
+    .editor-head {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+</style>
+
+<style is:global>
+  #productImagesPreview .empty-note,
+  #sizesBoard .empty-note {
+    margin: 0;
+    padding: 0.75rem;
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    color: var(--muted);
+    background: #fff;
+    font-size: 0.88rem;
+  }
+
+  #productImagesPreview .preview-main {
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fff;
+    max-width: 360px;
+    width: 100%;
+  }
+
+  #productImagesPreview .preview-main img {
+    display: block;
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+  }
+
+  #productImagesPreview .preview-main p {
+    margin: 0;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.76rem;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+  }
+
+  #productImagesPreview .preview-thumbs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 72px));
+    gap: 0.4rem;
+  }
+
+  #productImagesPreview .preview-item {
+    display: grid;
+    gap: 0.3rem;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 10px;
+    padding: 0.28rem;
+    width: 72px;
+  }
+
+  #productImagesPreview .preview-thumb-wrap {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  #productImagesPreview .preview-item img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 7px;
+  }
+
+  #productImagesPreview .preview-badge {
+    position: absolute;
+    top: 0.3rem;
+    left: 0.3rem;
+    padding: 0.1rem 0.28rem;
+    border-radius: 999px;
+    background: rgba(17, 17, 17, 0.75);
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 700;
+  }
+
+  #productImagesPreview .preview-remove {
+    border: 1px solid #efc4c4;
+    background: #fff1f1;
+    color: #a94444;
+    border-radius: 999px;
+    font-size: 0.64rem;
+    font-weight: 700;
+    padding: 0.18rem 0.3rem;
+    cursor: pointer;
+  }
+
+  #sizesBoard .size-card {
+    display: grid;
+    gap: 0.5rem;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    padding: 0.6rem;
+    background: #fff;
+  }
+
+  #sizesBoard .size-card.available {
+    border-color: color-mix(in srgb, var(--ok) 35%, #fff);
+    background: color-mix(in srgb, var(--ok) 12%, #fff);
+  }
+
+  #sizesBoard .size-card.unavailable {
+    border-color: #d4cfc3;
+    background: #f4f0e7;
+    color: #7b7b7b;
+  }
+
+  #sizesBoard .size-card-main {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  #sizesBoard .size-card-main strong {
+    font-size: 0.95rem;
+  }
+
+  #sizesBoard .size-card-main span {
+    font-size: 0.82rem;
+  }
+
+  #sizesBoard .size-card-actions {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  #sizesBoard .size-toggle,
+  #sizesBoard .size-remove {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    cursor: pointer;
+    padding: 0.28rem 0.5rem;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  #sizesBoard .size-toggle {
+    background: #fff;
+    border-color: #d9d3c7;
+    color: #3e3e3e;
+  }
+
+  #sizesBoard .size-remove {
+    background: #fff1f1;
+    border-color: #efc4c4;
+    color: #a94444;
+  }
+</style>
