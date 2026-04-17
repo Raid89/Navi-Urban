@@ -4,7 +4,6 @@ import Navbar from '../components/sections/Navbar.astro';
 import HeroSection from '../components/sections/HeroSection.astro';
 import PromotionsSection from '../components/sections/PromotionsSection.astro';
 import CatalogSection from '../components/sections/CatalogSection.astro';
-import PdfCatalogSection from '../components/sections/PdfCatalogSection.astro';
 import SiteFooter from '../components/sections/SiteFooter.astro';
 import { getPromotions, getVisibleProducts } from '../lib/catalog';
 
@@ -13,12 +12,11 @@ const [promotions, products] = await Promise.all([getPromotions(), getVisiblePro
 
 <BaseLayout
   title="NAVI URBAN | Zapatos Urbanos"
-  description="NAVI URBAN: landing oficial de zapatos con promociones, catalogo interactivo y descarga de PDF."
+  description="NAVI URBAN: landing oficial de zapatos urbanos y deportivos con promociones y catalogo interactivo."
 >
   <Navbar />
   <HeroSection />
   <PromotionsSection promotions={promotions} />
   <CatalogSection products={products} />
-  <PdfCatalogSection />
   <SiteFooter />
 </BaseLayout>

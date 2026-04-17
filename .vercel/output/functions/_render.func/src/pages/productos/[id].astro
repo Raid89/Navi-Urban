@@ -73,6 +73,15 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
             </div>
           ))}
         </div>
+
+        <a
+          href={`https://wa.me/573204656149?text=Hola%20NAVI%20URBAN%2C%20me%20interesa%20${encodeURIComponent(product.name)}%20en%20%24${product.price}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn btn-buy-now"
+        >
+          Comprar por WhatsApp
+        </a>
       </article>
     </section>
   </main>
