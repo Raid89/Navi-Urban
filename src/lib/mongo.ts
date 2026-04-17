@@ -1,28 +1,33 @@
 import { MongoClient } from 'mongodb';
 import './env';
 
-const mongoUri = process.env.MONGODB_URI;
 const databaseName = process.env.MONGODB_DB || 'naviurban';
-
-if (!mongoUri) {
-  throw new Error('Missing MONGODB_URI. Define it in .env or .env.local.');
-}
 
 const globalForMongo = globalThis as typeof globalThis & {
   mongoClient?: MongoClient;
   mongoClientPromise?: Promise<MongoClient>;
 };
+function getMongoUri() {
+  const mongoUri = process.env.MONGODB_URI;
 
-const client = globalForMongo.mongoClient ?? new MongoClient(mongoUri);
+  if (!mongoUri) {
+    throw new Error('Missing MONGODB_URI. Define it in .env or .env.local.');
+  }
 
-if (!globalForMongo.mongoClientPromise) {
-  globalForMongo.mongoClient = client;
-  globalForMongo.mongoClientPromise = client.connect();
+  return mongoUri;
 }
 
-export const mongoClientPromise = globalForMongo.mongoClientPromise;
+function getMongoClientPromise() {
+  if (!globalForMongo.mongoClientPromise) {
+    const client = globalForMongo.mongoClient ?? new MongoClient(getMongoUri());
+    globalForMongo.mongoClient = client;
+    globalForMongo.mongoClientPromise = client.connect();
+  }
+
+  return globalForMongo.mongoClientPromise;
+}
 
 export async function getDatabase() {
-  const connectedClient = await mongoClientPromise;
+  const connectedClient = await getMongoClientPromise();
   return connectedClient.db(databaseName);
 }

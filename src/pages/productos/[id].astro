@@ -7,7 +7,14 @@ import { getProductImageUrl } from '../../lib/catalog';
 import type { ProductItem } from '../../types/catalog';
 
 const productId = Astro.params.id;
-const product = productId ? await getProductById(productId) : null;
+let product: ProductItem | null = null;
+
+try {
+  product = productId ? await getProductById(productId) : null;
+} catch (error) {
+  console.error(`Failed to load product ${productId ?? 'unknown'}.`, error);
+  throw new Response('Servicio temporalmente no disponible', { status: 503 });
+}
 
 if (!product) {
   throw new Response('Producto no encontrado', { status: 404 });

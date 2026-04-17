@@ -7,7 +7,14 @@ import CatalogSection from '../components/sections/CatalogSection.astro';
 import SiteFooter from '../components/sections/SiteFooter.astro';
 import { getPromotions, getVisibleProducts } from '../lib/catalog';
 
-const [promotions, products] = await Promise.all([getPromotions(), getVisibleProducts()]);
+let promotions = [] as Awaited<ReturnType<typeof getPromotions>>;
+let products = [] as Awaited<ReturnType<typeof getVisibleProducts>>;
+
+try {
+  [promotions, products] = await Promise.all([getPromotions(), getVisibleProducts()]);
+} catch (error) {
+  console.error('Failed to load home catalog data.', error);
+}
 ---
 
 <BaseLayout
