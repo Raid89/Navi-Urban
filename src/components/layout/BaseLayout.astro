@@ -1,5 +1,6 @@
 ---
 import '../../styles/global.css';
+import WhatsAppButton from '../WhatsAppButton.astro';
 
 interface Props {
   title: string;
@@ -12,8 +13,7 @@ const { title, description } = Astro.props;
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" href="/favicon.ico" />
+    <link rel="icon" href="https://res.cloudinary.com/dzp3psldw/image/upload/abf7033a-6dbe-4526-bf8c-619f04547e00_preview_rev_1_hrwgie" />
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
@@ -27,5 +27,6 @@ const { title, description } = Astro.props;
   </head>
   <body>
     <slot />
+    <WhatsAppButton />
   </body>
 </html>

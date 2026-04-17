@@ -1,0 +1,58 @@
+---
+const whatsappNumber = '573204656149';
+const whatsappUrl = `https://wa.me/${whatsappNumber}?text=Hola%20NAVI%20URBAN`;
+---
+
+<a
+  href={whatsappUrl}
+  target="_blank"
+  rel="noopener noreferrer"
+  class="whatsapp-button"
+  aria-label="Contactar por WhatsApp"
+  title="Contactar por WhatsApp"
+>
+  <img src="https://cdn-icons-png.flaticon.com/512/3670/3670051.png" alt="WhatsApp" class="whatsapp-icon" />
+</a>
+
+<style>
+  .whatsapp-button {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: transform 200ms ease;
+    z-index: 40;
+    border: none;
+    background: none;
+    padding: 0;
+  }
+
+  .whatsapp-button:hover {
+    transform: scale(1.1);
+  }
+
+  .whatsapp-button:active {
+    transform: scale(0.95);
+  }
+
+  .whatsapp-icon {
+    width: 60px;
+    height: 60px;
+    display: block;
+  }
+
+  @media (max-width: 640px) {
+    .whatsapp-button {
+      bottom: 1.5rem;
+      right: 1.5rem;
+    }
+
+    .whatsapp-icon {
+      width: 56px;
+      height: 56px;
+    }
+  }
+</style>
