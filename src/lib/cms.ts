@@ -1,4 +1,4 @@
-import type { ProductItem, PromotionItem, ProductImageValue } from '../types/catalog';
+import type { ProductItem, PromotionItem, ProductImageValue, OrderItem, OrderStatus } from '../types/catalog';
 import { getDatabase } from './mongo';
 
 export type ProductDocument = ProductItem & {
@@ -30,8 +30,15 @@ export type AdminSessionDocument = {
   expiresAt?: Date;
 };
 
+export type OrderDocument = Omit<OrderItem, 'id' | 'createdAt' | 'updatedAt'> & {
+  _id?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
 const productsCollectionName = 'products';
 const promotionsCollectionName = 'promotions';
+const ordersCollectionName = 'orders';
 const adminsCollectionName = 'admins';
 const adminSessionsCollectionName = 'admin_sessions';
 
@@ -136,6 +143,51 @@ export async function upsertPromotion(promotion: PromotionItem) {
 export async function deletePromotion(id: string) {
   const database = await getDatabase();
   await database.collection<PromotionDocument>(promotionsCollectionName).deleteOne({ _id: id });
+}
+
+export async function createOrder(order: Omit<OrderItem, 'id' | 'status' | 'createdAt' | 'updatedAt'>) {
+  const database = await getDatabase();
+  const createdAt = new Date();
+
+  const result = await database.collection<OrderDocument>(ordersCollectionName).insertOne({
+    ...order,
+    status: 'Tomado',
+    createdAt,
+    updatedAt: createdAt
+  });
+
+  return {
+    id: result.insertedId.toString(),
+    status: 'Tomado' as OrderStatus,
+    createdAt: createdAt.toISOString()
+  };
+}
+
+export async function getOrders() {
+  const database = await getDatabase();
+  const orders = await database.collection<OrderDocument>(ordersCollectionName).find({}).sort({ createdAt: -1 }).toArray();
+
+  return orders.map((order) => ({
+    ...order,
+    id: order._id,
+    createdAt: order.createdAt ? order.createdAt.toISOString() : undefined,
+    updatedAt: order.updatedAt ? order.updatedAt.toISOString() : undefined
+  })) as OrderItem[];
+}
+
+export async function updateOrderStatus(id: string, status: OrderStatus) {
+  const database = await getDatabase();
+  const result = await database.collection<OrderDocument>(ordersCollectionName).updateOne(
+    { _id: id },
+    {
+      $set: {
+        status,
+        updatedAt: new Date()
+      }
+    }
+  );
+
+  return result.matchedCount > 0;
 }
 
 export async function getAdminByUsername(username: string) {

@@ -176,15 +176,82 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
     </div>
   </section>
 
+  <section id="orderSuccessPopup" class="success-modal" hidden aria-hidden="true">
+    <div class="success-backdrop" id="successBackdrop"></div>
+    <div class="success-dialog" role="dialog" aria-modal="true" aria-labelledby="orderSuccessTitle">
+      <div class="success-mark" aria-hidden="true">
+        <span class="success-ring"></span>
+        <span class="success-check">✓</span>
+      </div>
+      <h3 id="orderSuccessTitle">Compra Exitosa</h3>
+      <p id="orderSuccessDescription">Tu pedido fue recibido correctamente. En breve un asesor se comunicara contigo para confirmar los detalles.</p>
+      <button type="button" class="btn btn-main" id="closeSuccessPopupButton">Entendido</button>
+    </div>
+  </section>
+
   <script type="module" src="/scripts/product-gallery.js"></script>
 
   <SiteFooter />
 </BaseLayout>
 
 <style>
+  .product-detail-page {
+    padding-block: 1.1rem 1.8rem;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.9rem;
+    padding: 0.36rem 0.72rem;
+    border: 1px solid #ddd5c7;
+    border-radius: 999px;
+    color: #4a4a4a;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.84rem;
+    background: #fff;
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .back-link:hover {
+    transform: translateY(-1px);
+    border-color: #bdb4a6;
+    box-shadow: 0 10px 20px rgba(17, 17, 17, 0.08);
+  }
+
+  .product-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 1rem;
+    align-items: start;
+  }
+
   .product-gallery {
     display: grid;
     gap: 1rem;
+    background: linear-gradient(180deg, #fcfbf8 0%, #f8f4ec 100%);
+    border: 1px solid #e2dacc;
+    border-radius: 20px;
+    padding: 0.9rem;
+    box-shadow: 0 12px 28px rgba(17, 17, 17, 0.08);
+  }
+
+  .product-main-image {
+    background: #fff;
+    border: 1px solid #e4dbc9;
+    border-radius: 16px;
+    overflow: hidden;
+    min-height: 330px;
+    display: grid;
+    place-items: center;
+  }
+
+  .product-main-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .product-colors {
@@ -218,11 +285,11 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform 0.18s ease, border-color 0.18s ease;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   }
 
   .color-chip:hover {
-    transform: translateY(-1px);
+    transform: translateY(-1px) scale(1.04);
   }
 
   .color-chip.is-active {
@@ -248,8 +315,67 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
     gap: 0.6rem;
   }
 
+  .product-thumb {
+    border: 1px solid #ddd5c7;
+    border-radius: 11px;
+    background: #fff;
+    padding: 0.2rem;
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .product-thumb img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 9px;
+    display: block;
+  }
+
+  .product-thumb:hover {
+    transform: translateY(-2px);
+    border-color: #bcb3a4;
+    box-shadow: 0 10px 16px rgba(17, 17, 17, 0.1);
+  }
+
+  .product-thumb.is-active {
+    border-color: #181818;
+    box-shadow: 0 0 0 1px #181818 inset;
+  }
+
   .product-thumb[hidden] {
     display: none;
+  }
+
+  .product-detail-card {
+    background: #fff;
+    border: 1px solid #e2d9cb;
+    border-radius: 20px;
+    padding: 1rem;
+    box-shadow: 0 14px 30px rgba(17, 17, 17, 0.08);
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .product-detail-card h1 {
+    margin: 0;
+    font-size: clamp(1.5rem, 2.6vw, 2rem);
+    line-height: 1.1;
+  }
+
+  .product-detail-card .badge {
+    justify-self: start;
+  }
+
+  .product-meta {
+    margin: 0;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .product-detail-price {
+    margin: 0.15rem 0 0.25rem;
+    font-size: clamp(1.35rem, 2.6vw, 1.7rem);
   }
 
   .sizes-grid {
@@ -276,6 +402,7 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
 
   .size-option:hover {
     transform: translateY(-1px);
+    box-shadow: 0 10px 14px rgba(17, 17, 17, 0.08);
   }
 
   .size-option.is-active {
@@ -313,6 +440,70 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
     margin-top: 0.8rem;
   }
 
+  .purchase-actions .btn,
+  .checkout-actions .btn {
+    min-height: 44px;
+    padding: 0.72rem 1.05rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    border: 1px solid transparent;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, filter 0.18s ease;
+  }
+
+  .purchase-actions .btn:hover,
+  .checkout-actions .btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .purchase-actions .btn:active,
+  .checkout-actions .btn:active {
+    transform: translateY(0);
+  }
+
+  .purchase-actions .btn:focus-visible,
+  .checkout-actions .btn:focus-visible,
+  .checkout-close:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(54, 45, 34, 0.18);
+  }
+
+  .btn-buy-now {
+    background: linear-gradient(130deg, #23c45f, #158a52);
+    color: #fff;
+    box-shadow: 0 12px 20px rgba(24, 114, 61, 0.26);
+  }
+
+  .btn-buy-now:hover {
+    filter: brightness(1.03);
+    box-shadow: 0 14px 24px rgba(24, 114, 61, 0.3);
+  }
+
+  .purchase-actions .btn-main,
+  .checkout-actions .btn-main {
+    background: linear-gradient(132deg, var(--brand), #ff8d49);
+    color: #fff;
+    box-shadow: 0 12px 22px rgba(224, 106, 39, 0.24);
+  }
+
+  .purchase-actions .btn-main:hover,
+  .checkout-actions .btn-main:hover {
+    filter: brightness(1.03);
+    box-shadow: 0 14px 25px rgba(224, 106, 39, 0.3);
+  }
+
+  .checkout-actions .btn-ghost {
+    border-color: #d6cdbc;
+    background: #fff;
+    color: #3f3f3f;
+  }
+
+  .checkout-actions .btn-ghost:hover {
+    border-color: #beb3a3;
+    box-shadow: 0 8px 14px rgba(17, 17, 17, 0.08);
+  }
+
   .checkout-modal {
     position: fixed;
     inset: 0;
@@ -329,7 +520,7 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
   .checkout-backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(12, 12, 12, 0.45);
+    background: rgba(12, 12, 12, 0.5);
     backdrop-filter: blur(2px);
   }
 
@@ -338,13 +529,13 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
     width: min(560px, 100%);
     max-height: calc(100vh - 2rem);
     overflow: auto;
-    border: 1px solid #d8d1c4;
+    border: 1px solid #ded4c3;
     border-radius: 16px;
-    background: #fff;
+    background: linear-gradient(180deg, #fff 0%, #fcfaf6 100%);
     padding: 0.9rem;
     display: grid;
     gap: 0.75rem;
-    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 24px 50px rgba(0, 0, 0, 0.22);
   }
 
   .checkout-head {
@@ -356,7 +547,7 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
 
   .checkout-head h3 {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1.08rem;
   }
 
   .checkout-close {
@@ -365,7 +556,16 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
     background: #fff;
     padding: 0.28rem 0.65rem;
     font: inherit;
+    font-weight: 700;
+    color: #444;
     cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .checkout-close:hover {
+    transform: translateY(-1px);
+    border-color: #bcb3a4;
+    box-shadow: 0 8px 14px rgba(17, 17, 17, 0.1);
   }
 
   .checkout-summary {
@@ -396,6 +596,13 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
     background: #fff;
     padding: 0.56rem 0.6rem;
     font: inherit;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .checkout-form input:focus {
+    outline: none;
+    border-color: #6f6456;
+    box-shadow: 0 0 0 3px rgba(111, 100, 86, 0.14);
   }
 
   .checkout-actions {
@@ -432,7 +639,151 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
     font-size: 0.88rem;
   }
 
+  .success-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 130;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+  }
+
+  .success-modal[hidden] {
+    display: none;
+  }
+
+  .success-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(8, 10, 16, 0.58);
+    backdrop-filter: blur(2px);
+  }
+
+  .success-dialog {
+    position: relative;
+    width: min(420px, 100%);
+    border-radius: 20px;
+    border: 1px solid #d8d1c4;
+    background: linear-gradient(180deg, #fff 0%, #fbf7ef 100%);
+    box-shadow: 0 28px 56px rgba(0, 0, 0, 0.26);
+    padding: 1.2rem;
+    text-align: center;
+    display: grid;
+    gap: 0.75rem;
+    animation: success-popup-in 480ms cubic-bezier(0.2, 0.85, 0.3, 1);
+  }
+
+  .success-dialog h3 {
+    margin: 0;
+    font-size: 1.4rem;
+  }
+
+  .success-dialog p {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.45;
+  }
+
+  .success-mark {
+    position: relative;
+    width: 86px;
+    height: 86px;
+    margin: 0 auto 0.2rem;
+    display: grid;
+    place-items: center;
+  }
+
+  .success-ring {
+    position: absolute;
+    width: 86px;
+    height: 86px;
+    border-radius: 999px;
+    border: 5px solid #27b36a;
+    box-shadow: 0 0 0 10px rgba(39, 179, 106, 0.12);
+    animation: success-ring-pop 620ms ease-out;
+  }
+
+  .success-check {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #1f9a5b;
+    animation: success-check-pop 700ms ease-out;
+  }
+
+  @keyframes success-popup-in {
+    0% {
+      opacity: 0;
+      transform: translateY(16px) scale(0.92);
+    }
+
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes success-ring-pop {
+    0% {
+      transform: scale(0.2);
+      opacity: 0;
+    }
+
+    70% {
+      transform: scale(1.06);
+      opacity: 1;
+    }
+
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes success-check-pop {
+    0% {
+      transform: scale(0.2) rotate(-16deg);
+      opacity: 0;
+    }
+
+    65% {
+      transform: scale(1.15) rotate(3deg);
+      opacity: 1;
+    }
+
+    100% {
+      transform: scale(1) rotate(0deg);
+    }
+  }
+
   body.checkout-open {
     overflow: hidden;
+  }
+
+  @media (max-width: 960px) {
+    .product-detail-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .product-main-image {
+      min-height: 280px;
+    }
+
+    .checkout-dialog {
+      width: min(520px, 100%);
+      max-height: calc(100vh - 1rem);
+    }
+
+    .purchase-actions .btn,
+    .checkout-actions .btn-main {
+      width: 100%;
+    }
+
+    .checkout-actions {
+      align-items: stretch;
+    }
+
+    .remember-row {
+      width: 100%;
+      margin-right: 0;
+    }
   }
 </style>

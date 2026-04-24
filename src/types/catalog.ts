@@ -38,3 +38,27 @@ export interface ProductItem {
   images: ProductImageValue[];
   sizes: ProductSizeItem[];
 }
+
+export type OrderStatus = 'Tomado' | 'Enviado' | 'Entregado';
+
+export interface OrderCustomerInfo {
+  name: string;
+  document: string;
+  address: string;
+  city: string;
+  phone: string;
+}
+
+export interface OrderItem {
+  id?: string;
+  productId: string;
+  productName: string;
+  color: string;
+  size: string;
+  price: number;
+  currency: 'MXN';
+  status: OrderStatus;
+  customer: OrderCustomerInfo;
+  createdAt?: string;
+  updatedAt?: string;
+}

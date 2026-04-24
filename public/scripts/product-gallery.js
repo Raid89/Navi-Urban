@@ -9,6 +9,11 @@ const closeCheckoutButton = document.getElementById('closeCheckoutButton');
 const quickCheckoutForm = document.getElementById('quickCheckoutForm');
 const rememberDataCheckbox = document.getElementById('rememberDataCheckbox');
 const checkoutSuccessMessage = document.getElementById('checkoutSuccessMessage');
+const orderSuccessPopup = document.getElementById('orderSuccessPopup');
+const successBackdrop = document.getElementById('successBackdrop');
+const closeSuccessPopupButton = document.getElementById('closeSuccessPopupButton');
+const orderSuccessDescription = document.getElementById('orderSuccessDescription');
+const productDetailCard = document.querySelector('[data-product-name]');
 const purchaseSelectionHint = document.getElementById('purchaseSelectionHint');
 const checkoutSummaryColor = document.getElementById('checkoutSummaryColor');
 const checkoutSummarySize = document.getElementById('checkoutSummarySize');
@@ -19,6 +24,14 @@ const checkoutCity = document.getElementById('checkoutCity');
 const checkoutPhone = document.getElementById('checkoutPhone');
 
 const PROFILE_STORAGE_KEY = 'navi-urban-checkout-profile-v1';
+
+const PRODUCT_ORDER_ENDPOINT = '/api/orders';
+
+const productName = productDetailCard instanceof HTMLElement ? String(productDetailCard.getAttribute('data-product-name') || '').trim() : '';
+const productId = String(window.location.pathname.split('/').pop() || '').trim();
+const priceNode = document.querySelector('.product-detail-price');
+const priceText = priceNode instanceof HTMLElement ? String(priceNode.textContent || '') : '';
+const parsedPrice = Number(priceText.replace(/[^\d]/g, ''));
 
 let selectedSize = '';
 
@@ -116,6 +129,24 @@ const closeCheckoutPanel = () => {
   if (!(checkoutPanel instanceof HTMLElement)) return;
   checkoutPanel.hidden = true;
   checkoutPanel.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('checkout-open');
+};
+
+const openSuccessPopup = (message) => {
+  if (!(orderSuccessPopup instanceof HTMLElement)) return;
+  orderSuccessPopup.hidden = false;
+  orderSuccessPopup.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('checkout-open');
+
+  if (orderSuccessDescription instanceof HTMLElement) {
+    orderSuccessDescription.textContent = message;
+  }
+};
+
+const closeSuccessPopup = () => {
+  if (!(orderSuccessPopup instanceof HTMLElement)) return;
+  orderSuccessPopup.hidden = true;
+  orderSuccessPopup.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('checkout-open');
 };
 
@@ -223,8 +254,23 @@ checkoutBackdrop?.addEventListener('click', () => {
 
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
-  if (!(checkoutPanel instanceof HTMLElement) || checkoutPanel.hidden) return;
-  closeCheckoutPanel();
+
+  if (orderSuccessPopup instanceof HTMLElement && !orderSuccessPopup.hidden) {
+    closeSuccessPopup();
+    return;
+  }
+
+  if (checkoutPanel instanceof HTMLElement && !checkoutPanel.hidden) {
+    closeCheckoutPanel();
+  }
+});
+
+closeSuccessPopupButton?.addEventListener('click', () => {
+  closeSuccessPopup();
+});
+
+successBackdrop?.addEventListener('click', () => {
+  closeSuccessPopup();
 });
 
 rememberDataCheckbox?.addEventListener('change', () => {
@@ -256,17 +302,56 @@ quickCheckoutForm?.addEventListener('submit', (event) => {
     return;
   }
 
-  if (rememberDataCheckbox instanceof HTMLInputElement && rememberDataCheckbox.checked) {
-    saveProfile();
-  } else {
-    clearProfile();
+  const customer = {
+    name: checkoutName instanceof HTMLInputElement ? checkoutName.value.trim() : '',
+    document: checkoutDocument instanceof HTMLInputElement ? checkoutDocument.value.trim() : '',
+    address: checkoutAddress instanceof HTMLInputElement ? checkoutAddress.value.trim() : '',
+    city: checkoutCity instanceof HTMLInputElement ? checkoutCity.value.trim() : '',
+    phone: checkoutPhone instanceof HTMLInputElement ? checkoutPhone.value.trim() : ''
+  };
+
+  const submitButton = quickCheckoutForm.querySelector('button[type="submit"]');
+  if (submitButton instanceof HTMLButtonElement) {
+    submitButton.disabled = true;
+    submitButton.textContent = 'Procesando...';
   }
 
-  const customerName = checkoutName instanceof HTMLInputElement ? checkoutName.value.trim() : 'Cliente';
-  if (checkoutSuccessMessage instanceof HTMLElement) {
-    checkoutSuccessMessage.hidden = false;
-    checkoutSuccessMessage.textContent = `Compra exitosa, ${customerName}. En breve un asesor se comunicara contigo para confirmar tu pedido.`;
-  }
+  fetch(PRODUCT_ORDER_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      productId,
+      productName,
+      color: selectedColor,
+      size: selectedSize,
+      price: parsedPrice,
+      currency: 'MXN',
+      customer
+    })
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error('No se pudo registrar el pedido');
+      }
+
+      if (rememberDataCheckbox instanceof HTMLInputElement && rememberDataCheckbox.checked) {
+        saveProfile();
+      } else {
+        clearProfile();
+      }
+
+      closeCheckoutPanel();
+      openSuccessPopup(`Compra exitosa, ${customer.name || 'cliente'}. Tu pedido fue tomado correctamente y en breve un asesor se comunicara contigo.`);
+    })
+    .catch((error) => {
+      setSelectionHint(error instanceof Error ? error.message : 'No se pudo completar la compra. Intenta de nuevo.');
+    })
+    .finally(() => {
+      if (submitButton instanceof HTMLButtonElement) {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Confirmar compra';
+      }
+    });
 });
 
 applyColorFilter('');

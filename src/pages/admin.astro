@@ -4,14 +4,14 @@ import Navbar from '../components/sections/Navbar.astro';
 import SiteFooter from '../components/sections/SiteFooter.astro';
 import { getProductImageUrl } from '../lib/catalog';
 import { getAuthenticatedAdmin } from '../lib/adminSession';
-import { getAllProducts, getPromotions } from '../lib/cms';
+import { getAllProducts, getOrders, getPromotions } from '../lib/cms';
 
 const auth = await getAuthenticatedAdmin(Astro.cookies);
 const loginError = Astro.url.searchParams.get('error');
 const viewParam = Astro.url.searchParams.get('view');
-const activeView = viewParam === 'promotions' ? 'promotions' : 'products';
+const activeView = viewParam === 'promotions' || viewParam === 'orders' ? viewParam : 'products';
 
-const [products, promotions] = auth ? await Promise.all([getAllProducts(), getPromotions()]) : [[], []];
+const [products, promotions, orders] = auth ? await Promise.all([getAllProducts(), getPromotions(), getOrders()]) : [[], [], []];
 ---
 
 <BaseLayout title="NAVI URBAN Admin" description="Panel de administracion para productos y promociones de NAVI URBAN.">
@@ -37,6 +37,9 @@ const [products, promotions] = auth ? await Promise.all([getAllProducts(), getPr
           </a>
           <a class={`switch-btn ${activeView === 'promotions' ? 'active' : ''}`} href="/admin?view=promotions">
             Promociones ({promotions.length})
+          </a>
+          <a class={`switch-btn ${activeView === 'orders' ? 'active' : ''}`} href="/admin?view=orders">
+            Pedidos ({orders.length})
           </a>
         </section>
 
@@ -95,7 +98,7 @@ const [products, promotions] = auth ? await Promise.all([getAllProducts(), getPr
               </table>
             </div>
           </section>
-        ) : (
+        ) : activeView === 'promotions' ? (
           <section class="list-card">
             <div class="list-head">
               <div>
@@ -119,6 +122,63 @@ const [products, promotions] = auth ? await Promise.all([getAllProducts(), getPr
                   </div>
                 </article>
               ))}
+            </div>
+          </section>
+        ) : (
+          <section class="list-card">
+            <div class="list-head">
+              <div>
+                <p class="eyebrow">Pedidos</p>
+                <h2>Listado de pedidos</h2>
+              </div>
+            </div>
+
+            <div class="table-wrapper">
+              <table class="products-table">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Producto</th>
+                    <th>Detalle</th>
+                    <th>Contacto</th>
+                    <th>Estado</th>
+                    <th>Accion</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((order) => (
+                    <tr>
+                      <td>
+                        <strong>{order.customer.name}</strong>
+                        <small>{order.customer.document}</small>
+                      </td>
+                      <td>
+                        <strong>{order.productName}</strong>
+                        <small>${order.price} {order.currency}</small>
+                      </td>
+                      <td>
+                        <small>Color: {order.color}</small>
+                        <small>Talla: {order.size}</small>
+                      </td>
+                      <td>
+                        <small>{order.customer.phone}</small>
+                        <small>{order.customer.city}</small>
+                        <small>{order.customer.address}</small>
+                      </td>
+                      <td>
+                        <select data-order-status-id={order.id}>
+                          <option value="Tomado" selected={order.status === 'Tomado'}>Tomado</option>
+                          <option value="Enviado" selected={order.status === 'Enviado'}>Enviado</option>
+                          <option value="Entregado" selected={order.status === 'Entregado'}>Entregado</option>
+                        </select>
+                      </td>
+                      <td>
+                        <button class="btn btn-ghost" type="button" data-save-order-status={order.id}>Guardar</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </section>
         )}
@@ -151,12 +211,18 @@ const [products, promotions] = auth ? await Promise.all([getAllProducts(), getPr
   <SiteFooter />
 
   <script>
+    // @ts-nocheck
     const productSearch = document.getElementById('productSearch');
     const productsTable = document.getElementById('productsTable');
     const deleteButtonsProduct = Array.from(document.querySelectorAll('[data-delete-product]'));
     const deleteButtonsPromotion = Array.from(document.querySelectorAll('[data-delete-promotion]'));
+    const saveOrderButtons = Array.from(document.querySelectorAll('[data-save-order-status]'));
 
-    const setButtonLoading = (button, loadingLabel) => {
+    /**
+     * @param {HTMLButtonElement} button
+     * @param {string} loadingLabel
+     */
+    function setButtonLoading(button, loadingLabel) {
       if (!(button instanceof HTMLButtonElement)) return;
       const defaultLabel = button.dataset.defaultLabel || button.textContent || '';
 
@@ -167,7 +233,7 @@ const [products, promotions] = auth ? await Promise.all([getAllProducts(), getPr
       button.disabled = true;
       button.setAttribute('aria-busy', 'true');
       button.textContent = loadingLabel;
-    };
+    }
 
     document.querySelectorAll('form').forEach((form) => {
       form.addEventListener('submit', (event) => {
@@ -195,11 +261,13 @@ const [products, promotions] = auth ? await Promise.all([getAllProducts(), getPr
     });
 
     productSearch?.addEventListener('input', () => {
+      if (!(productSearch instanceof HTMLInputElement)) return;
       const query = String(productSearch.value || '').toLowerCase().trim();
       const rows = Array.from(productsTable?.querySelectorAll('tbody tr') || []);
 
       rows.forEach((row) => {
         const source = String(row.textContent || '').toLowerCase();
+        if (!(row instanceof HTMLElement)) return;
         row.style.display = source.includes(query) ? '' : 'none';
       });
     });
@@ -218,6 +286,7 @@ const [products, promotions] = auth ? await Promise.all([getAllProducts(), getPr
         });
 
         if (!response.ok) {
+          if (!(button instanceof HTMLButtonElement)) return;
           button.disabled = false;
           button.setAttribute('aria-busy', 'false');
           button.textContent = button.dataset.defaultLabel || 'Eliminar';
@@ -243,10 +312,42 @@ const [products, promotions] = auth ? await Promise.all([getAllProducts(), getPr
         });
 
         if (!response.ok) {
+          if (!(button instanceof HTMLButtonElement)) return;
           button.disabled = false;
           button.setAttribute('aria-busy', 'false');
           button.textContent = button.dataset.defaultLabel || 'Eliminar';
           alert('No se pudo eliminar la promocion');
+          return;
+        }
+
+        window.location.reload();
+      });
+    });
+
+    saveOrderButtons.forEach((button) => {
+      button.addEventListener('click', async () => {
+        const id = button.getAttribute('data-save-order-status');
+        if (!id) return;
+
+        const select = document.querySelector(`[data-order-status-id="${id}"]`);
+        const nextStatus = select instanceof HTMLSelectElement ? select.value : '';
+
+        if (!nextStatus) return;
+
+        setButtonLoading(button, 'Guardando...');
+
+        const response = await fetch('/api/admin/orders', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, status: nextStatus })
+        });
+
+        if (!response.ok) {
+          if (!(button instanceof HTMLButtonElement)) return;
+          button.disabled = false;
+          button.setAttribute('aria-busy', 'false');
+          button.textContent = button.dataset.defaultLabel || 'Guardar';
+          alert('No se pudo actualizar el estado del pedido');
           return;
         }
 
@@ -392,6 +493,12 @@ const [products, promotions] = auth ? await Promise.all([getAllProducts(), getPr
       display: block;
       color: var(--muted);
       margin-top: 0.2rem;
+    }
+
+    .products-table td small {
+      display: block;
+      color: var(--muted);
+      margin-top: 0.15rem;
     }
 
     .status-pill {
