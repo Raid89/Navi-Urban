@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import dns from 'node:dns';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
@@ -17,6 +18,14 @@ if (!globalForEnv.envLoaded) {
     }
     if (existsSync(envLocalPath)) {
       dotenv.config({ path: envLocalPath, override: false });
+    }
+
+    const shouldUsePublicDns = process.env.NODE_ENV !== 'production' && process.env.ENABLE_PUBLIC_DNS_FIX === 'true';
+    if (shouldUsePublicDns) {
+      const dnsServers = dns.getServers();
+      if (dnsServers.some((server) => server === '127.0.0.1' || server === '::1')) {
+        dns.setServers(['1.1.1.1', '8.8.8.8']);
+      }
     }
   } catch (error) {
     // Silently fail if .env loading fails (e.g., in Vercel/production)
