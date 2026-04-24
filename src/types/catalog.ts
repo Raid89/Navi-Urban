@@ -13,9 +13,16 @@ export interface ProductSizeItem {
 export interface ProductImageItem {
   url: string;
   publicId: string;
+  color?: string;
+}
+
+export interface ProductColorItem {
+  name: string;
+  hex: string;
 }
 
 export type ProductImageValue = string | ProductImageItem;
+export type ProductColorValue = string | ProductColorItem;
 
 export interface ProductItem {
   id: string;
@@ -27,6 +34,7 @@ export interface ProductItem {
   tag: string;
   isPromotion: boolean;
   visible: boolean;
+  colors?: ProductColorValue[];
   images: ProductImageValue[];
   sizes: ProductSizeItem[];
 }

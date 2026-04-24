@@ -2,8 +2,7 @@
 import BaseLayout from '../../components/layout/BaseLayout.astro';
 import Navbar from '../../components/sections/Navbar.astro';
 import SiteFooter from '../../components/sections/SiteFooter.astro';
-import { getProductById } from '../../lib/catalog';
-import { getProductImageUrl } from '../../lib/catalog';
+import { getProductById, getProductColorOptions, getProductImageColor, getProductImageUrl, normalizeProductImages } from '../../lib/catalog';
 import type { ProductItem } from '../../types/catalog';
 
 const productId = Astro.params.id;
@@ -19,6 +18,10 @@ try {
 if (!product) {
   throw new Response('Producto no encontrado', { status: 404 });
 }
+
+const galleryImages = normalizeProductImages(product.images);
+const colorOptions = getProductColorOptions(product);
+const initialMainImage = getProductImageUrl(galleryImages[0]);
 
 const formatPrice = (price: number, currency: ProductItem['currency']) =>
   new Intl.NumberFormat('es-MX', {
@@ -40,20 +43,39 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
     <section class="product-detail-grid">
       <div class="product-gallery">
         <div class="product-main-image">
-          <img
-            id="productMainImage"
-            src={getProductImageUrl(product.images[0])}
-            alt={`Imagen principal de ${product.name}`}
-            loading="eager"
-          />
+          <img id="productMainImage" src={initialMainImage} alt={`Imagen principal de ${product.name}`} loading="eager" />
         </div>
+
+        {colorOptions.length ? (
+          <div class="product-colors">
+            <p class="product-colors-label">Colores</p>
+            <div class="color-chip-list" role="tablist" aria-label={`Filtros de color para ${product.name}`}>
+              <button type="button" class="color-chip color-chip-all is-active" data-color-filter="" aria-label="Todos los colores" title="Todos los colores">
+                <span aria-hidden="true" class="color-dot color-dot-all"></span>
+              </button>
+              {colorOptions.map((color) => (
+                <button
+                  type="button"
+                  class="color-chip"
+                  data-color-filter={color.name}
+                  aria-label={`Color ${color.name}`}
+                  title={color.name}
+                >
+                  <span aria-hidden="true" class="color-dot" style={`--swatch:${color.hex};`}></span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div class="product-thumbs">
-          {product.images.map((image, index) => (
+          {galleryImages.map((image, index) => (
             <button
               type="button"
               class={`product-thumb product-thumb-btn ${index === 0 ? 'is-active' : ''}`}
               data-thumb-src={getProductImageUrl(image)}
               data-thumb-alt={`Vista ${index + 1} de ${product.name}`}
+              data-image-color={getProductImageColor(image)}
               aria-label={`Ver imagen ${index + 1} de ${product.name}`}
             >
               <img src={getProductImageUrl(image)} alt={`Vista ${index + 1} de ${product.name}`} loading="lazy" />
@@ -62,7 +84,7 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
         </div>
       </div>
 
-      <article class="product-detail-card">
+      <article class="product-detail-card" data-product-name={product.name}>
         <span class="badge">{product.tag}</span>
         <h1>{product.name}</h1>
         <p class="product-meta">
@@ -72,50 +94,345 @@ const formatPrice = (price: number, currency: ProductItem['currency']) =>
         <p class="price product-detail-price">{formatPrice(product.price, product.currency)}</p>
 
         <h2>Tallas</h2>
-        <div class="sizes-grid">
+        <div class="sizes-grid" id="sizeOptionsGrid">
           {product.sizes.map((sizeOption) => (
-            <div class={`size-pill ${sizeOption.available ? 'available' : 'unavailable'}`}>
-              <span>Talla {sizeOption.size}</span>
-              <strong>{sizeOption.available ? 'Disponible' : 'Agotada'}</strong>
-            </div>
+            sizeOption.available ? (
+              <button type="button" class="size-pill size-option" data-size-option={sizeOption.size}>
+                <span>Talla {sizeOption.size}</span>
+                <strong>Disponible</strong>
+              </button>
+            ) : (
+              <div class="size-pill unavailable" aria-disabled="true">
+                <span>Talla {sizeOption.size}</span>
+                <strong>Agotada</strong>
+              </div>
+            )
           ))}
         </div>
 
-        <a
-          href={`https://wa.me/573204656149?text=Hola%20NAVI%20URBAN%2C%20me%20interesa%20${encodeURIComponent(product.name)}%20en%20%24${product.price}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="btn btn-buy-now"
-        >
-          Comprar por WhatsApp
-        </a>
+        <p id="purchaseSelectionHint" class="selection-hint" aria-live="polite"></p>
+
+        <div class="purchase-actions">
+          <a
+            href={`https://wa.me/573204656149?text=Hola%20NAVI%20URBAN%2C%20me%20interesa%20${encodeURIComponent(product.name)}%20en%20%24${product.price}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn btn-buy-now"
+          >
+            Comprar por WhatsApp
+          </a>
+          <button type="button" class="btn btn-main" id="buyNowButton">Comprar ahora</button>
+        </div>
+
       </article>
     </section>
   </main>
 
+  <section id="checkoutPanel" class="checkout-modal" hidden aria-hidden="true">
+    <div class="checkout-backdrop" id="checkoutBackdrop"></div>
+    <div class="checkout-dialog" role="dialog" aria-modal="true" aria-labelledby="checkoutModalTitle">
+      <header class="checkout-head">
+        <h3 id="checkoutModalTitle">Finalizar compra</h3>
+        <button type="button" class="checkout-close" id="closeCheckoutButton" aria-label="Cerrar formulario">Cerrar</button>
+      </header>
+
+      <p class="checkout-summary">
+        <span id="checkoutSummaryColor">Color: pendiente</span>
+        <span id="checkoutSummarySize">Talla: pendiente</span>
+      </p>
+
+      <form id="quickCheckoutForm" class="checkout-form" novalidate>
+        <label>
+          Nombre
+          <input id="checkoutName" name="name" required />
+        </label>
+        <label>
+          Documento
+          <input id="checkoutDocument" name="document" required />
+        </label>
+        <label>
+          Direccion
+          <input id="checkoutAddress" name="address" required />
+        </label>
+        <label>
+          Ciudad
+          <input id="checkoutCity" name="city" required />
+        </label>
+        <label>
+          Telefono
+          <input id="checkoutPhone" name="phone" required />
+        </label>
+
+        <div class="checkout-actions">
+          <label class="remember-row" for="rememberDataCheckbox">
+            <input type="checkbox" id="rememberDataCheckbox" />
+            <span>Recordar mis datos para futuras compras</span>
+          </label>
+          <button type="submit" class="btn btn-main">Confirmar compra</button>
+        </div>
+      </form>
+
+      <p id="checkoutSuccessMessage" class="checkout-success" hidden></p>
+    </div>
+  </section>
+
+  <script type="module" src="/scripts/product-gallery.js"></script>
+
   <SiteFooter />
 </BaseLayout>
 
-<script>
-  const mainImage = document.getElementById('productMainImage');
-  const thumbButtons = Array.from(document.querySelectorAll('[data-thumb-src]'));
+<style>
+  .product-gallery {
+    display: grid;
+    gap: 1rem;
+  }
 
-  thumbButtons.forEach((thumbButton) => {
-    thumbButton.addEventListener('click', () => {
-      if (!(mainImage instanceof HTMLImageElement)) return;
+  .product-colors {
+    display: grid;
+    gap: 0.45rem;
+  }
 
-      const nextSrc = thumbButton.getAttribute('data-thumb-src');
-      const nextAlt = thumbButton.getAttribute('data-thumb-alt');
+  .product-colors-label {
+    margin: 0;
+    font-size: 0.84rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
 
-      if (!nextSrc) return;
+  .color-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
 
-      mainImage.src = nextSrc;
-      if (nextAlt) {
-        mainImage.alt = nextAlt;
-      }
+  .color-chip {
+    width: 2.15rem;
+    height: 2.15rem;
+    border: 2px solid #d7d0c3;
+    background: #fff;
+    border-radius: 999px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease;
+  }
 
-      thumbButtons.forEach((button) => button.classList.remove('is-active'));
-      thumbButton.classList.add('is-active');
-    });
-  });
-</script>
+  .color-chip:hover {
+    transform: translateY(-1px);
+  }
+
+  .color-chip.is-active {
+    border-color: #1f1f1f;
+    box-shadow: 0 0 0 2px #fff inset;
+  }
+
+  .color-dot {
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 999px;
+    border: 1px solid #d4d4d4;
+    background: var(--swatch, #d2d2d2);
+  }
+
+  .color-dot-all {
+    background: conic-gradient(#ff6b6b, #ffd166, #06d6a0, #4cc9f0, #a78bfa, #ff6b6b);
+  }
+
+  .product-thumbs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 72px));
+    gap: 0.6rem;
+  }
+
+  .product-thumb[hidden] {
+    display: none;
+  }
+
+  .sizes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 0.55rem;
+  }
+
+  .size-pill {
+    border: 1px solid #d8d1c4;
+    border-radius: 12px;
+    padding: 0.5rem 0.6rem;
+    display: grid;
+    gap: 0.12rem;
+    background: #fff;
+  }
+
+  .size-option {
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    transition: border-color 0.18s ease, transform 0.18s ease;
+  }
+
+  .size-option:hover {
+    transform: translateY(-1px);
+  }
+
+  .size-option.is-active {
+    border-color: #1f1f1f;
+    box-shadow: 0 0 0 1px #1f1f1f inset;
+  }
+
+  .size-pill.unavailable {
+    opacity: 0.65;
+    background: #f7f3eb;
+  }
+
+  .size-pill span {
+    font-size: 0.88rem;
+  }
+
+  .size-pill strong {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+
+  .selection-hint {
+    margin: 0.65rem 0 0;
+    font-size: 0.86rem;
+    color: var(--muted);
+    min-height: 1.2rem;
+  }
+
+  .purchase-actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 0.8rem;
+  }
+
+  .checkout-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+  }
+
+  .checkout-modal[hidden] {
+    display: none;
+  }
+
+  .checkout-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(12, 12, 12, 0.45);
+    backdrop-filter: blur(2px);
+  }
+
+  .checkout-dialog {
+    position: relative;
+    width: min(560px, 100%);
+    max-height: calc(100vh - 2rem);
+    overflow: auto;
+    border: 1px solid #d8d1c4;
+    border-radius: 16px;
+    background: #fff;
+    padding: 0.9rem;
+    display: grid;
+    gap: 0.75rem;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.2);
+  }
+
+  .checkout-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .checkout-head h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .checkout-close {
+    border: 1px solid #d8d1c4;
+    border-radius: 999px;
+    background: #fff;
+    padding: 0.28rem 0.65rem;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .checkout-summary {
+    margin: 0;
+    display: flex;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .checkout-form {
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .checkout-form label {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.86rem;
+    font-weight: 700;
+  }
+
+  .checkout-form input {
+    width: 100%;
+    border: 1px solid #d8d1c4;
+    border-radius: 9px;
+    background: #fff;
+    padding: 0.56rem 0.6rem;
+    font: inherit;
+  }
+
+  .checkout-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 0.35rem;
+    align-items: center;
+  }
+
+  .remember-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-right: auto;
+    font-size: 0.85rem;
+    color: #454545;
+    font-weight: 600;
+  }
+
+  .remember-row input {
+    width: 1rem;
+    height: 1rem;
+    accent-color: #111;
+  }
+
+  .checkout-success {
+    margin: 0;
+    border: 1px solid #b7e5c4;
+    background: #edfbf1;
+    color: #19703b;
+    border-radius: 10px;
+    padding: 0.55rem 0.65rem;
+    font-size: 0.88rem;
+  }
+
+  body.checkout-open {
+    overflow: hidden;
+  }
+</style>

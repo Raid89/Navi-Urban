@@ -13,6 +13,37 @@ const { product = null, title, subtitle, submitLabel, cancelHref } = Astro.props
 
 const initialImages = JSON.stringify(product?.images ?? []);
 const initialSizes = JSON.stringify(product?.sizes ?? []);
+const normalizeHex = (value: string) => {
+  const normalized = String(value || '').trim();
+  const expanded = normalized.startsWith('#') ? normalized : `#${normalized}`;
+  return /^#[0-9a-fA-F]{6}$/.test(expanded) ? expanded.toLowerCase() : '#bdbdbd';
+};
+
+const colorMap = new Map<string, { name: string; hex: string }>();
+
+(product?.colors ?? []).forEach((color) => {
+  if (typeof color === 'string') {
+    const name = String(color || '').trim();
+    if (!name) return;
+    colorMap.set(name.toLowerCase(), { name, hex: '#bdbdbd' });
+    return;
+  }
+
+  const name = String(color.name || '').trim();
+  if (!name) return;
+  colorMap.set(name.toLowerCase(), { name, hex: normalizeHex(color.hex) });
+});
+
+(product?.images ?? []).forEach((image) => {
+  const name = typeof image === 'string' ? '' : String(image.color || '').trim();
+  if (!name) return;
+  const key = name.toLowerCase();
+  if (!colorMap.has(key)) {
+    colorMap.set(key, { name, hex: '#bdbdbd' });
+  }
+});
+
+const initialColors = JSON.stringify([...colorMap.values()]);
 ---
 
 <article class="editor-card">
@@ -27,6 +58,7 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
   <form id="productForm" method="post" action="/api/admin/products" class="editor-form">
     <input type="hidden" name="id" value={product?.id || ''} />
     <input type="hidden" id="productImagesJson" name="imagesJson" value={initialImages} />
+    <input type="hidden" id="colorsJson" name="colorsJson" value={initialColors} />
     <input type="hidden" id="sizesJson" name="sizesJson" value={initialSizes} />
 
     <label>
@@ -75,8 +107,21 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
 
     <section class="subsection">
       <div class="subsection-head">
+        <h2>Colores</h2>
+        <p>Define los colores disponibles del modelo y luego asignalos a cada imagen.</p>
+      </div>
+      <div id="colorsBoard" class="colors-board"></div>
+      <div class="color-adder">
+        <input id="newColorInput" placeholder="Nombre (ej. Blanco)" />
+        <input id="newColorHexInput" type="color" value="#bdbdbd" aria-label="Seleccionar color" />
+        <button type="button" class="btn btn-ghost" id="addColorButton">Agregar color</button>
+      </div>
+    </section>
+
+    <section class="subsection">
+      <div class="subsection-head">
         <h2>Imagenes</h2>
-        <p>Sube imagenes a Cloudinary y revisa la previsualizacion.</p>
+        <p>Sube imagenes a Cloudinary, revisa la previsualizacion y asigna un color por imagen.</p>
       </div>
       <div class="upload-actions">
         <input id="productImageInput" type="file" accept="image/*" multiple />
@@ -91,20 +136,41 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
 </article>
 
 <script>
-  const productForm = document.getElementById('productForm');
-  const uploadButton = document.getElementById('uploadProductImages');
-  const productImageInput = document.getElementById('productImageInput');
-  const productImagesJson = document.getElementById('productImagesJson');
-  const productImagesPreview = document.getElementById('productImagesPreview');
-  const sizesJsonInput = document.getElementById('sizesJson');
-  const sizesBoard = document.getElementById('sizesBoard');
-  const newSizeInput = document.getElementById('newSizeInput');
-  const addSizeButton = document.getElementById('addSizeButton');
-  const uploadStatus = document.getElementById('uploadStatus');
-  const submitButton = document.getElementById('productSubmitButton');
+  type ProductImageEntry = {
+    url: string;
+    publicId: string;
+    color?: string;
+  };
+
+  type ProductSizeEntry = {
+    size: string;
+    available: boolean;
+  };
+
+  type ProductColorEntry = {
+    name: string;
+    hex: string;
+  };
+
+  const productForm = document.getElementById('productForm') as HTMLFormElement | null;
+  const uploadButton = document.getElementById('uploadProductImages') as HTMLButtonElement | null;
+  const productImageInput = document.getElementById('productImageInput') as HTMLInputElement | null;
+  const productImagesJson = document.getElementById('productImagesJson') as HTMLInputElement | null;
+  const productImagesPreview = document.getElementById('productImagesPreview') as HTMLElement | null;
+  const colorsJsonInput = document.getElementById('colorsJson') as HTMLInputElement | null;
+  const colorsBoard = document.getElementById('colorsBoard') as HTMLElement | null;
+  const newColorInput = document.getElementById('newColorInput') as HTMLInputElement | null;
+  const newColorHexInput = document.getElementById('newColorHexInput') as HTMLInputElement | null;
+  const addColorButton = document.getElementById('addColorButton') as HTMLButtonElement | null;
+  const sizesJsonInput = document.getElementById('sizesJson') as HTMLInputElement | null;
+  const sizesBoard = document.getElementById('sizesBoard') as HTMLElement | null;
+  const newSizeInput = document.getElementById('newSizeInput') as HTMLInputElement | null;
+  const addSizeButton = document.getElementById('addSizeButton') as HTMLButtonElement | null;
+  const uploadStatus = document.getElementById('uploadStatus') as HTMLElement | null;
+  const submitButton = document.getElementById('productSubmitButton') as HTMLButtonElement | null;
   let isSubmitting = false;
 
-  const setButtonBusy = (button, isBusy, busyLabel) => {
+  const setButtonBusy = (button: HTMLButtonElement | null, isBusy: boolean, busyLabel: string) => {
     if (!(button instanceof HTMLButtonElement)) return;
     const defaultLabel = button.dataset.defaultLabel || button.textContent || '';
 
@@ -122,26 +188,103 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
     uploadStatus.textContent = text;
   };
 
-  const parseImages = () => {
+  const escapeHtml = (value: string | number | null | undefined) =>
+    String(value ?? '').replace(/[&<>'"]/g, (character) => {
+      switch (character) {
+        case '&':
+          return '&amp;';
+        case '<':
+          return '&lt;';
+        case '>':
+          return '&gt;';
+        case '"':
+          return '&quot;';
+        case "'":
+          return '&#39;';
+        default:
+          return character;
+      }
+    });
+
+  const parseImages = (): ProductImageEntry[] => {
     try {
-      return JSON.parse(productImagesJson?.value || '[]');
+      return JSON.parse(productImagesJson?.value || '[]') as ProductImageEntry[];
     } catch {
       return [];
     }
   };
 
-  const parseSizes = () => {
+  const parseColors = (): ProductColorEntry[] => {
     try {
-      return JSON.parse(sizesJsonInput?.value || '[]');
+      const parsed = JSON.parse(colorsJsonInput?.value || '[]') as Array<ProductColorEntry | string>;
+      return parsed
+        .map((item) => {
+          if (typeof item === 'string') {
+            const name = String(item || '').trim();
+            return name ? { name, hex: '#bdbdbd' } : null;
+          }
+
+          const name = String(item?.name || '').trim();
+          if (!name) return null;
+
+          const normalizedHex = String(item?.hex || '').trim();
+          const hex = /^#[0-9a-fA-F]{6}$/.test(normalizedHex) ? normalizedHex.toLowerCase() : '#bdbdbd';
+          return { name, hex };
+        })
+        .filter((item): item is ProductColorEntry => Boolean(item));
     } catch {
       return [];
     }
   };
 
-  const saveSizes = (sizes) => {
+  const parseSizes = (): ProductSizeEntry[] => {
+    try {
+      return JSON.parse(sizesJsonInput?.value || '[]') as ProductSizeEntry[];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveSizes = (sizes: ProductSizeEntry[]) => {
     if (sizesJsonInput) {
       sizesJsonInput.value = JSON.stringify(sizes);
     }
+  };
+
+  const saveColors = (colors: ProductColorEntry[]) => {
+    if (colorsJsonInput) {
+      colorsJsonInput.value = JSON.stringify(colors);
+    }
+  };
+
+  const saveImages = (images: Array<ProductImageEntry | string>) => {
+    if (productImagesJson) {
+      productImagesJson.value = JSON.stringify(images);
+    }
+  };
+
+  const getImageUrl = (image: ProductImageEntry | string | undefined) => (image && typeof image === 'object' ? image.url || '' : String(image || ''));
+
+  const getImageColor = (image: ProductImageEntry | string | undefined) => (image && typeof image === 'object' ? String(image.color || '').trim() : '');
+
+  const normalizeColorKey = (value: string | undefined) => String(value || '').trim().toLowerCase();
+
+  const normalizeColorHex = (value: string | undefined) => {
+    const normalized = String(value || '').trim();
+    const expanded = normalized.startsWith('#') ? normalized : `#${normalized}`;
+    return /^#[0-9a-fA-F]{6}$/.test(expanded) ? expanded.toLowerCase() : '#bdbdbd';
+  };
+
+  const getUniqueColors = (values: ProductColorEntry[]) => {
+    const map = new Map<string, ProductColorEntry>();
+
+    values.forEach((entry) => {
+      const name = String(entry?.name || '').trim();
+      if (!name) return;
+      map.set(normalizeColorKey(name), { name, hex: normalizeColorHex(entry.hex) });
+    });
+
+    return [...map.values()];
   };
 
   const renderSizes = () => {
@@ -155,7 +298,7 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
 
     sizesBoard.innerHTML = sizes
       .map(
-        (sizeOption, index) => `
+        (sizeOption: ProductSizeEntry, index: number) => `
           <article class="size-card ${sizeOption.available ? 'available' : 'unavailable'}" data-size-index="${index}">
             <div class="size-card-main">
               <strong>Talla ${sizeOption.size}</strong>
@@ -194,8 +337,117 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
     });
   };
 
+  const renderColors = () => {
+    if (!colorsBoard) return;
+    const colors = parseColors();
+
+    if (!colors.length) {
+      colorsBoard.innerHTML = '<p class="empty-note">Agrega colores para poder asignarlos a las imagenes.</p>';
+      return;
+    }
+
+    colorsBoard.innerHTML = colors
+      .map(
+        (color: ProductColorEntry, index: number) => `
+          <article class="color-card" data-color-index="${index}">
+            <div class="color-card-main">
+              <label class="color-name-field">
+                <span>Nombre</span>
+                <input type="text" value="${escapeHtml(color.name)}" data-color-name-index="${index}" />
+              </label>
+              <label class="color-hex-field">
+                <span>Tono</span>
+                <input type="color" value="${escapeHtml(normalizeColorHex(color.hex))}" data-color-hex-index="${index}" />
+              </label>
+            </div>
+            <div class="color-card-actions">
+              <button type="button" class="color-remove" data-remove-color="${index}">Eliminar</button>
+            </div>
+          </article>
+        `
+      )
+      .join('');
+
+    colorsBoard.querySelectorAll('[data-remove-color]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const index = Number(button.getAttribute('data-remove-color'));
+        const currentColors = parseColors();
+        if (Number.isNaN(index) || !currentColors[index]) return;
+
+        const removedColor = String(currentColors[index]?.name || '').trim();
+        currentColors.splice(index, 1);
+        saveColors(getUniqueColors(currentColors));
+
+        const updatedImages = parseImages().map((image: ProductImageEntry | string) => {
+          if (typeof image === 'string') return image;
+          if (normalizeColorKey(image.color) !== normalizeColorKey(removedColor)) {
+            return image;
+          }
+
+          return { ...image, color: '' };
+        });
+
+        saveImages(updatedImages);
+        renderColors();
+        renderImages();
+      });
+    });
+
+    colorsBoard.querySelectorAll<HTMLInputElement>('[data-color-name-index]').forEach((input) => {
+      input.addEventListener('change', () => {
+        const index = Number(input.getAttribute('data-color-name-index'));
+        const currentColors = parseColors();
+        if (Number.isNaN(index) || !currentColors[index]) return;
+
+        const previousName = currentColors[index].name;
+        const nextName = String(input.value || '').trim();
+        if (!nextName) {
+          alert('El nombre del color es obligatorio');
+          renderColors();
+          return;
+        }
+
+        const duplicated = currentColors.some((color, colorIndex) => colorIndex !== index && normalizeColorKey(color.name) === normalizeColorKey(nextName));
+        if (duplicated) {
+          alert('Ese color ya existe');
+          renderColors();
+          return;
+        }
+
+        currentColors[index] = { ...currentColors[index], name: nextName };
+        saveColors(getUniqueColors(currentColors));
+
+        const updatedImages = parseImages().map((image: ProductImageEntry | string) => {
+          if (typeof image === 'string') return image;
+          if (normalizeColorKey(image.color) !== normalizeColorKey(previousName)) {
+            return image;
+          }
+
+          return { ...image, color: nextName };
+        });
+
+        saveImages(updatedImages);
+        renderColors();
+        renderImages();
+      });
+    });
+
+    colorsBoard.querySelectorAll<HTMLInputElement>('[data-color-hex-index]').forEach((input) => {
+      input.addEventListener('change', () => {
+        const index = Number(input.getAttribute('data-color-hex-index'));
+        const currentColors = parseColors();
+        if (Number.isNaN(index) || !currentColors[index]) return;
+
+        currentColors[index] = { ...currentColors[index], hex: normalizeColorHex(input.value) };
+        saveColors(getUniqueColors(currentColors));
+        renderColors();
+      });
+    });
+  };
+
   const renderImages = () => {
     const images = parseImages();
+    const colors = parseColors();
     if (!productImagesPreview) return;
 
     if (!images.length) {
@@ -203,15 +455,36 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
       return;
     }
 
-    const mainImage = images[0]?.url || images[0];
+    const mainImage = getImageUrl(images[0]);
     const thumbs = images
       .map(
-        (image, index) => `
-          <article class="preview-item">
+        (image: ProductImageEntry | string, index: number) => `
+          <article class="preview-item" data-image-index="${index}">
             <div class="preview-thumb-wrap">
-              <img src="${image.url || image}" alt="Imagen ${index + 1}" />
+              <img src="${escapeHtml(getImageUrl(image))}" alt="Imagen ${index + 1}" />
               <span class="preview-badge">#${index + 1}</span>
             </div>
+            ${
+              colors.length
+                ? `
+                  <label class="preview-color-field">
+                    <span>Color</span>
+                    <select class="preview-color-select" data-image-color-index="${index}">
+                      <option value="">Sin color</option>
+                      ${getUniqueColors(colors)
+                        .map(
+                          (color) => `
+                            <option value="${escapeHtml(color.name)}" ${normalizeColorKey(color.name) === normalizeColorKey(getImageColor(image)) ? 'selected' : ''}>
+                              ${escapeHtml(color.name)}
+                            </option>
+                          `
+                        )
+                        .join('')}
+                    </select>
+                  </label>
+                `
+                : '<p class="preview-color-empty">Agrega colores para asignar variantes.</p>'
+            }
             <button type="button" class="preview-remove" data-remove-image="${index}">Quitar</button>
           </article>
         `
@@ -232,7 +505,25 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
         const current = parseImages();
         if (Number.isNaN(index)) return;
         current.splice(index, 1);
-        if (productImagesJson) productImagesJson.value = JSON.stringify(current);
+        saveImages(current);
+        renderImages();
+      });
+    });
+
+    productImagesPreview.querySelectorAll<HTMLSelectElement>('[data-image-color-index]').forEach((select) => {
+      select.addEventListener('change', () => {
+        const index = Number(select.getAttribute('data-image-color-index'));
+        const current = parseImages();
+        if (Number.isNaN(index) || !current[index]) return;
+
+        const nextColor = String(select.value || '').trim();
+        if (typeof current[index] === 'string') {
+          current[index] = { url: current[index], publicId: '', color: nextColor };
+        } else {
+          current[index] = { ...current[index], color: nextColor };
+        }
+
+        saveImages(current);
         renderImages();
       });
     });
@@ -257,8 +548,8 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
 
       const image = await response.json();
       const current = parseImages();
-      current.push(image);
-      if (productImagesJson) productImagesJson.value = JSON.stringify(current);
+      current.push({ ...image, color: '' } as ProductImageEntry);
+      saveImages(current);
     }
 
     if (productImageInput) productImageInput.value = '';
@@ -286,7 +577,7 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
     if (!sizeValue) return;
 
     const current = parseSizes();
-    if (current.some((item) => String(item.size) === sizeValue)) {
+    if (current.some((item: ProductSizeEntry) => String(item.size) === sizeValue)) {
       alert('Esa talla ya existe');
       return;
     }
@@ -295,6 +586,26 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
     saveSizes(current);
     if (newSizeInput) newSizeInput.value = '';
     renderSizes();
+  });
+
+  addColorButton?.addEventListener('click', () => {
+    const colorName = String(newColorInput?.value || '').trim();
+    if (!colorName) return;
+
+    const colorHex = normalizeColorHex(String(newColorHexInput?.value || '#bdbdbd'));
+
+    const current = parseColors();
+    if (current.some((value: ProductColorEntry) => normalizeColorKey(value.name) === normalizeColorKey(colorName))) {
+      alert('Ese color ya existe');
+      return;
+    }
+
+    current.push({ name: colorName, hex: colorHex });
+    saveColors(getUniqueColors(current));
+    if (newColorInput) newColorInput.value = '';
+    if (newColorHexInput) newColorHexInput.value = '#bdbdbd';
+    renderColors();
+    renderImages();
   });
 
   productForm?.addEventListener('submit', () => {
@@ -307,10 +618,14 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
     if (sizesJsonInput) {
       sizesJsonInput.value = JSON.stringify(parseSizes());
     }
+    if (colorsJsonInput) {
+      colorsJsonInput.value = JSON.stringify(getUniqueColors(parseColors()));
+    }
 
     setButtonBusy(submitButton, true, 'Guardando...');
   });
 
+  renderColors();
   renderSizes();
   renderImages();
 </script>
@@ -417,6 +732,94 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
     font-size: 0.88rem;
   }
 
+  .colors-board {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.55rem;
+  }
+
+  .color-card {
+    display: grid;
+    gap: 0.5rem;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    padding: 0.6rem;
+    background: #fff;
+  }
+
+  .color-card-main {
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .color-name-field,
+  .color-hex-field {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .color-name-field span,
+  .color-hex-field span {
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+
+  .color-name-field input {
+    width: 100%;
+  }
+
+  .color-hex-field input {
+    width: 56px;
+    height: 34px;
+    padding: 0.2rem;
+    border-radius: 8px;
+    border: 1px solid #d8d1c4;
+    cursor: pointer;
+  }
+
+  .color-card-actions {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  .color-remove {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    cursor: pointer;
+    padding: 0.28rem 0.5rem;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    background: #fff1f1;
+    border-color: #efc4c4;
+    color: #a94444;
+  }
+
+  .color-adder {
+    display: flex;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+  }
+
+  .color-adder input {
+    flex: 1;
+    min-width: 150px;
+  }
+
+  #newColorHexInput {
+    width: 56px;
+    min-width: 56px;
+    height: 40px;
+    padding: 0.2rem;
+    border-radius: 10px;
+    border: 1px solid #d8d1c4;
+    cursor: pointer;
+  }
+
   .upload-actions {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -494,6 +897,35 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
     color: #fff;
     font-size: 0.62rem;
     font-weight: 700;
+  }
+
+  .preview-color-field {
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.66rem;
+    color: var(--muted);
+  }
+
+  .preview-color-field span {
+    font-weight: 700;
+    color: #505050;
+  }
+
+  .preview-color-select {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid #d8d1c4;
+    background: #fff;
+    font: inherit;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.3rem;
+  }
+
+  .preview-color-empty {
+    margin: 0;
+    font-size: 0.66rem;
+    color: var(--muted);
+    line-height: 1.2;
   }
 
   .preview-remove {
@@ -696,6 +1128,35 @@ const initialSizes = JSON.stringify(product?.sizes ?? []);
     color: #fff;
     font-size: 0.62rem;
     font-weight: 700;
+  }
+
+  #productImagesPreview .preview-color-field {
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.66rem;
+    color: var(--muted);
+  }
+
+  #productImagesPreview .preview-color-field span {
+    font-weight: 700;
+    color: #505050;
+  }
+
+  #productImagesPreview .preview-color-select {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid #d8d1c4;
+    background: #fff;
+    font: inherit;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.3rem;
+  }
+
+  #productImagesPreview .preview-color-empty {
+    margin: 0;
+    font-size: 0.66rem;
+    color: var(--muted);
+    line-height: 1.2;
   }
 
   #productImagesPreview .preview-remove {
